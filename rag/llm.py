@@ -1,7 +1,7 @@
 import ollama
 import os
 
-MODEL = "qwen2.5:7b-instruct"
+MODEL = "qwen2.5:3b-instruct"
 
 ollama_client = ollama.Client(
     host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
