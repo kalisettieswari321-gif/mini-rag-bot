@@ -1,64 +1,121 @@
-# Mini RAG Telegram Bot (Option A)
+# Mini RAG Telegram Bot
+
+A Telegram chatbot that answers questions from a local document set using Retrieval-Augmented Generation (RAG). Relevant passages are retrieved with vector search and passed to a local Large Language Model, which generates answers grounded in those documents and cites the files they came from.
+
+The entire system runs locally with Docker Compose and uses no external LLM APIs or paid services.
 
 ## Project Metadata
 
-- **Author:** Naveen Kumar  
-- **Date:** 31-01-2026  
-- **License:** Educational / Learning Use  
-
+- **Original author:** Naveen Kumar
+- **Modified by:** Eswari Kalisetti
+- **Original project:** [SaraswathiAnalytics/mini-rag-bot](https://github.com/SaraswathiAnalytics/mini-rag-bot)
+- **License:** Educational / Learning Use (as stated by the original author)
 
 ## Overview
-This project implements a **Mini Retrieval-Augmented Generation (RAG)** system exposed through a **Telegram Bot**.  
-The bot answers user questions by retrieving relevant information from a small local document set and generating grounded responses using a **local Large Language Model (LLM)**.
 
-The entire system runs **locally using Docker**, with no external APIs or paid services.
+The bot ingests Markdown documents, splits them into chunks, converts each chunk into an embedding and stores everything in a SQLite vector database. When a user asks a question on Telegram, the bot embeds the question, retrieves the most similar chunks, builds a prompt from them and asks a local LLM to answer. The reply includes the names of the source documents used.
 
+## Demo
+
+| Start and help | Ask with sources | Summarize |
+|---|---|---|
+| ![Start and help](demo/start-help.png) | ![Ask with sources](demo/ask-sources.png) | ![Summarize](demo/summarize.png) |
 
 ## Features
-- Telegram bot interface
-- `/ask` command for knowledge-based queries
-- Local document ingestion and chunking
-- Vector similarity search using SQLite + `sqlite-vec`
-- Local embeddings using `sentence-transformers`
-- Local LLM inference using **Qwen 2.5 7B Instruct** via Ollama
-- Fully Dockerized using Docker Compose
 
+- Telegram bot interface
+- `/ask` command for knowledge-based questions
+- **Source citations:** every answer lists the document files it was built from
+- Local document ingestion and chunking
+- Vector similarity search using SQLite and `sqlite-vec`
+- Local embeddings using `sentence-transformers`
+- Local LLM inference using **Qwen 2.5 3B Instruct** via Ollama
+- `/summarize` command that summarizes the last 3 interactions
+- **Re-runnable ingestion:** running ingest again never creates duplicate chunks
+- Fully Dockerized with Docker Compose
+
+## Changes in This Version
+
+| Change | Description |
+|---|---|
+| Qwen 2.5 3B model | Uses `qwen2.5:3b-instruct` so the bot runs on a laptop with 8 GB RAM |
+| Source citations | `/ask` answers end with a `Sources:` line, for example `Sources: product.md, faq.md` |
+| Source tracking | The `documents` table has a `source` column, filled during ingestion and returned by retrieval |
+| Re-runnable ingestion | Tables are rebuilt on every ingest run, so repeated runs do not duplicate chunks |
+| `.gitignore` | Keeps `.env`, `.venv/` and `__pycache__/` out of the repository |
+
+Details are documented in [MY_CONTRIBUTIONS.md](MY_CONTRIBUTIONS.md).
 
 ## Architecture
-Documents → Chunking → Embeddings → SQLite Vector DB → Retrieval → LLM Answer
 
+```
+Documents (data/docs/*.md)
+        |
+        v
+  ingest.py: chunking (400 characters, 50 overlap)
+        |
+        v
+  sentence-transformers (all-MiniLM-L6-v2): 384-dimension embeddings
+        |
+        v
+  SQLite + sqlite-vec (db/rag.db: documents, source, embeddings)
+
+Telegram /ask <question>
+        |
+        v
+  app.py -> retrieve.py: embed the question, fetch the top 4 similar chunks and their sources
+        |
+        v
+  prompts.py: build a prompt from the retrieved chunks and the question
+        |
+        v
+  llm.py: Qwen 2.5 3B (Ollama) generates the answer
+        |
+        v
+  Telegram reply: answer + Sources
+```
 
 ## Models Used
 
 ### Embedding Model
-- **Model:** all-MiniLM-L6-v2  
-- **Reason:** Lightweight, fast, and suitable for semantic retrieval on small document collections.
+
+- **Model:** all-MiniLM-L6-v2
+- **Reason:** Lightweight, fast and suitable for semantic retrieval on small document collections.
 
 ### Language Model
-- **Model:** Qwen 2.5 7B Instruct  
-- **Runtime:** Ollama (local)  
-- **Reason:** Strong instruction-following, low hallucination, and fully offline.
 
+- **Model:** Qwen 2.5 3B Instruct
+- **Runtime:** Ollama (local)
+- **Reason:** Good instruction following with a small memory footprint, fully offline and able to run on 8 GB RAM.
 
-## Setup & Run (Docker)
+## Tech Stack
 
-### Prerequisites
-- Docker
-- Docker Compose
-- Telegram Bot Token
+| Area | Tools |
+|---|---|
+| Language | Python |
+| Bot framework | python-telegram-bot (Telegram Bot API) |
+| Embeddings | sentence-transformers |
+| Vector search | SQLite + sqlite-vec |
+| Text splitting | LangChain text splitters |
+| LLM runtime | Ollama (Qwen 2.5 3B Instruct) |
+| Packaging | Docker, Docker Compose |
 
-###
+## Project Structure
+
 ```
 mini-rag-bot/
-├── .venv/
-├── data_docs/
-│   ├── faq.md
-│   ├── policy.md
-│   └── product.md
+├── data/
+│   └── docs/
+│       ├── faq.md
+│       ├── policy.md
+│       └── product.md
 ├── db/
 │   └── rag.db
+├── demo/
+│   ├── start-help.png
+│   ├── ask-sources.png
+│   └── summarize.png
 ├── rag/
-│   ├── __pycache__/
 │   ├── ingest.py
 │   ├── llm.py
 │   ├── prompts.py
@@ -66,58 +123,104 @@ mini-rag-bot/
 ├── app.py
 ├── docker-compose.yml
 ├── Dockerfile
+├── MY_CONTRIBUTIONS.md
 ├── README.md
 └── requirements.txt
-
-```
-### Step 1: Clone Repository & Add Knowledge Documents
-- git clone https://github.com/SaraswathiAnalytics/mini-rag-bot.git
-- cd mini-rag-bot
-
-Place **3–5 short `.md` or `.txt` files** inside `data/docs/`:
-
-Example content:
-- Company policies
-- FAQs
-- Product documentation
-
-### Step 2: Configure Environment Variables
-
-**Do NOT hard-code your Telegram Bot token.**
-
-Create a `.env` file in the project root:
-
-```env
- - BOT_TOKEN=your_telegram_bot_token_here
 ```
 
-### Step 3: Start Ollama & Pull Model
-```bash
-# Start Ollama and Pull the LLM model:
-docker compose up ollama -d
-docker exec -it ollama ollama pull qwen2.5:7b-instruct
+## Setup and Run (Docker)
 
-# Ingest Documents
+### Prerequisites
+
+- Docker Desktop (Docker and Docker Compose)
+- A Telegram account and a bot token from [@BotFather](https://t.me/BotFather)
+- About 8 GB RAM
+
+### Step 1: Clone the repository and add documents
+
+```
+git clone https://github.com/kalisettieswari321-gif/mini-rag-bot.git
+cd mini-rag-bot
+```
+
+Place short `.md` or `.txt` files (policies, FAQs, product documentation) inside `data/docs/`.
+
+### Step 2: Configure environment variables
+
+Do not hard-code your Telegram bot token. Create a `.env` file in the project root:
+
+```
+BOT_TOKEN=your_telegram_bot_token_here
+```
+
+### Step 3: Build and start the containers
+
+```
+docker compose up -d --build
+```
+
+### Step 4: Download the model
+
+```
+docker exec -it ollama ollama pull qwen2.5:3b-instruct
+```
+
+### Step 5: Ingest the documents
+
+```
 docker compose run --rm rag-bot python rag/ingest.py
-# Start the Bot
-docker compose up --build -d
 ```
 
+### Step 6: Restart the bot
+
+```
+docker compose up -d --force-recreate rag-bot
+```
 
 ## Usage
-Open Telegram application/web app & search for your bot username
+
+Open Telegram, search for your bot username and start a chat.
 
 ### Commands
-- /start              Start the bot
-- /help               Show usage instructions
-- /ask <question>     Ask questions from documents
-- /summarize          Summarize last 3 interactions
 
+| Command | Description |
+|---|---|
+| `/start` | Start the bot |
+| `/help` | Show usage instructions |
+| `/ask <question>` | Ask a question from the documents |
+| `/summarize` | Summarize the last 3 interactions |
 
-### Examles
-- /ask What is the refund policy?
-- /ask How long does shipping take?
-- /ask What user roles are supported?
+### Examples
 
+```
+/ask What are the key features of the product?
+/ask What topics are covered in the uploaded documents?
+```
 
+Example reply:
 
+```
+The key features of the product are:
+- Real-time data processing
+- Customizable dashboards
+- Secure user authentication
+- API integration support
+- Automated reporting
+
+Sources: product.md, faq.md
+```
+
+## Security
+
+- The bot token is read from the `BOT_TOKEN` environment variable and stored only in a local `.env` file, which is excluded by `.gitignore`.
+- If a token is ever exposed, revoke it with `/revoke` in BotFather and update `.env`.
+
+## Credits and Attribution
+
+This project is based on [mini-rag-bot](https://github.com/SaraswathiAnalytics/mini-rag-bot), created by **Naveen Kumar**. The original architecture and core implementation are his work.
+
+This modified version is published as a separate repository with the permission of the original author. Changes made in this version are listed in [Changes in This Version](#changes-in-this-version) and in [MY_CONTRIBUTIONS.md](MY_CONTRIBUTIONS.md).
+
+## License
+
+The original project is released by its author for educational and learning use. This modified version keeps the original author's credit and follows the same educational and learning purpose.
