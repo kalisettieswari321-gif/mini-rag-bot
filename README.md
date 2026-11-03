@@ -38,13 +38,12 @@ The bot ingests Markdown documents, splits them into chunks, converts each chunk
 
 | Change | Description |
 |---|---|
-| Qwen 2.5 3B model | Uses `qwen2.5:3b-instruct` so the bot runs on a laptop with 8 GB RAM |
-| Source citations | `/ask` answers end with a `Sources:` line, for example `Sources: product.md, faq.md` |
-| Source tracking | The `documents` table has a `source` column, filled during ingestion and returned by retrieval |
+| Qwen 2.5 3B model | Uses `qwen2.5:3b-instruct` (changed in `rag/llm.py`) so the bot runs on a laptop with 8 GB RAM |
+| Source citations | `/ask` answers end with a `Sources:` line, for example `Sources: product.md, faq.md` (changed in `app.py`) |
+| Source tracking | The `documents` table has a `source` column filled in `rag/ingest.py` and returned by the new `retrieve_with_sources()` function in `rag/retrieve.py`. The original `retrieve()` function is kept |
 | Re-runnable ingestion | Tables are rebuilt on every ingest run, so repeated runs do not duplicate chunks |
 | `.gitignore` | Keeps `.env`, `.venv/` and `__pycache__/` out of the repository |
-
-Details are documented in [MY_CONTRIBUTIONS.md](MY_CONTRIBUTIONS.md).
+| Documentation | README rewritten for the current implementation, with screenshots of this version running on Telegram |
 
 ## Architecture
 
@@ -123,7 +122,6 @@ mini-rag-bot/
 ├── app.py
 ├── docker-compose.yml
 ├── Dockerfile
-├── MY_CONTRIBUTIONS.md
 ├── README.md
 └── requirements.txt
 ```
@@ -219,7 +217,7 @@ Sources: product.md, faq.md
 
 This project is based on [mini-rag-bot](https://github.com/SaraswathiAnalytics/mini-rag-bot), created by **Naveen Kumar**. The original architecture and core implementation are his work.
 
-This modified version is published as a separate repository with the permission of the original author. Changes made in this version are listed in [Changes in This Version](#changes-in-this-version) and in [MY_CONTRIBUTIONS.md](MY_CONTRIBUTIONS.md).
+This modified version is published as a separate repository with the permission of the original author. The changes made in this version are listed in [Changes in This Version](#changes-in-this-version).
 
 ## License
 
