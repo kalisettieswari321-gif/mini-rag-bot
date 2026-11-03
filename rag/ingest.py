@@ -16,15 +16,21 @@ conn = sqlite3.connect(DB_PATH)
 conn.enable_load_extension(True)
 sqlite_vec.load(conn)
 
+# Start fresh every time, so re-running ingest never creates duplicate chunks
+conn.execute("DROP TABLE IF EXISTS documents")
+conn.execute("DROP TABLE IF EXISTS embeddings")
+
+# 'source' stores which file each chunk came from (e.g. faq.md)
 conn.execute("""
-CREATE TABLE IF NOT EXISTS documents (
+CREATE TABLE documents (
     id INTEGER PRIMARY KEY,
-    content TEXT
+    content TEXT,
+    source TEXT
 )
 """)
 
 conn.execute("""
-CREATE VIRTUAL TABLE IF NOT EXISTS embeddings
+CREATE VIRTUAL TABLE embeddings
 USING vec0(embedding FLOAT[384]);
 """)
 
@@ -46,8 +52,8 @@ def ingest():
 
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO documents (content) VALUES (?)",
-                (chunk,)
+                "INSERT INTO documents (content, source) VALUES (?, ?)",
+                (chunk, file)
             )
             doc_id = cur.lastrowid
 

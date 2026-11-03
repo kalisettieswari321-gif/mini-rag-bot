@@ -14,7 +14,7 @@ from telegram.ext import (
     filters,
 )
 
-from rag.retrieve import retrieve
+from rag.retrieve import retrieve_with_sources
 from rag.llm import generate
 from rag.prompts import build_prompt, build_summary_prompt
 
@@ -79,15 +79,22 @@ async def ask_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         logger.info("User %s asked: %s", user_id, question)
 
-        context_text = retrieve(question)
+        # Retrieve matching chunks AND the files they came from
+        context_text, sources = retrieve_with_sources(question)
         prompt = build_prompt(context_text, question)
         answer = generate(prompt)
 
+        # History keeps only the answer (so /summarize works as before)
         CHAT_MEMORY[user_id].append(
             {"question": question, "answer": answer}
         )
 
-        await update.message.reply_text(answer)
+        # Reply = answer + the source files used to build it
+        reply = answer
+        if sources:
+            reply += "\n\n📄 Sources: " + ", ".join(sources)
+
+        await update.message.reply_text(reply)
 
     except Exception as exc:
         logger.exception("Error while processing /ask")
